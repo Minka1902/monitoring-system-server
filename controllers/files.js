@@ -80,6 +80,61 @@ function findFileAndPath(tree, targetName, pathToFileArray = []) {
     return { node: null, path: [] };
 };
 
+async function sumCsvFiles(node, pathToFile) {
+    if (node.children && node.children.length > 0) {
+        if (node.children[0].name.slice(-4) !== '.csv') {
+            const results = await Promise.all(
+                node.children.map(async (child) => {
+                    return await sumCsvFiles(child, `${pathToFile}/${child.name}`);
+                })
+            );
+            const filteredResults = results.filter((result) => result !== null);
+            return filteredResults.length > 0 ? filteredResults : null;
+        } else {
+            const results = { test: [], production: [], drilling: [] };
+            await Promise.all(
+                node.children.map(async (child) => {
+                    const filePath = path.join(__dirname, `${pathToFile}/${child.name}`);
+                    const fileData = await processCsvFile(filePath);
+                    const objectName = child.name.slice(child.name.lastIndexOf('-') + 1, -4);
+                    results[objectName] = results[objectName].concat(fileData);
+                })
+            );
+            return results;
+        }
+    }
+    return null;
+};
+
+// POST /files
+// ! request structure
+// ? req.body={ folderName: 'main' }
+module.exports.getAllPageFiles = async (req, res) => {
+    const { folderName } = req.body;
+    const directoryTree = readDirectoryTree(`./csvFiles/${folderName}`);
+    if (directoryTree) {
+        const { node, pathToFileArray } = findFileAndPath(directoryTree, fileName);
+        if (node && pathToFileArray) {
+            const pathToFile = constructUrl(pathToFileArray);
+            const pathFromRoot = path.join(__dirname, `../${pathToFile}`);
+            const fileData = await processCsvFile(pathFromRoot);
+            if (fileData) {
+                if (directoryTree) {
+                    if (node && pathToFileArray) {
+                        res.send(fileData);
+                    } else {
+                        res.send('Could not parse file.');
+                    }
+                } else {
+                    res.send('Could not find file in the file structure.');
+                }
+            }
+        }
+    } else {
+        res.send('Could not find directory');
+    }
+};
+
 // POST /file
 // ! request structure
 // ? req.body={ fileName: 'example.csv' }

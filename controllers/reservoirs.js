@@ -101,7 +101,11 @@ module.exports.scanDirectoryTree = async (req, res) => {
     const directoryTree = readDirectoryTree(`./forTreeView/${folderName}`);
     if (directoryTree) {
         const results = await sumWellsData(directoryTree, `../forTreeView/${folderName}`);
-        res.send(typeof results === 'object' && results.length === undefined ? results : results[0]);
+        if (typeof results === 'object' && results.length !== undefined) {
+            res.send(results);
+        } else {
+            res.send(typeof results === 'object' && results.length === undefined ? results : results[0]);
+        }
     } else {
         res.send('Could not find directory');
     }
