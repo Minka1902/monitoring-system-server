@@ -70,40 +70,17 @@ function findFileAndPath(tree, targetName, pathToFileArray = []) {
         return { node: tree, pathToFileArray: [...pathToFileArray, tree.name] };
     }
 
-    for (const child of tree.children) {
-        const result = findFileAndPath(child, targetName, [...pathToFileArray, tree.name]);
-        if (result.node) {
-            return result;
+    // for (const child in tree.children) {
+    if (tree.children && tree.children.length > 0) {
+        for (let i = 0; i < tree.children.length; i++) {
+            const result = findFileAndPath(tree.children[i], targetName, [...pathToFileArray, tree.name]);
+            if (result.node) {
+                return result;
+            }
         }
     }
 
     return { node: null, path: [] };
-};
-
-async function sumCsvFiles(node, pathToFile) {
-    if (node.children && node.children.length > 0) {
-        if (node.children[0].name.slice(-4) !== '.csv') {
-            const results = await Promise.all(
-                node.children.map(async (child) => {
-                    return await sumCsvFiles(child, `${pathToFile}/${child.name}`);
-                })
-            );
-            const filteredResults = results.filter((result) => result !== null);
-            return filteredResults.length > 0 ? filteredResults : null;
-        } else {
-            const results = { test: [], production: [], drilling: [] };
-            await Promise.all(
-                node.children.map(async (child) => {
-                    const filePath = path.join(__dirname, `${pathToFile}/${child.name}`);
-                    const fileData = await processCsvFile(filePath);
-                    const objectName = child.name.slice(child.name.lastIndexOf('-') + 1, -4);
-                    results[objectName] = results[objectName].concat(fileData);
-                })
-            );
-            return results;
-        }
-    }
-    return null;
 };
 
 // POST /files
@@ -111,24 +88,20 @@ async function sumCsvFiles(node, pathToFile) {
 // ? req.body={ folderName: 'main' }
 module.exports.getAllPageFiles = async (req, res) => {
     const { folderName } = req.body;
-    const directoryTree = readDirectoryTree(`./csvFiles/${folderName}`);
-    if (directoryTree) {
-        const { node, pathToFileArray } = findFileAndPath(directoryTree, fileName);
-        if (node && pathToFileArray) {
-            const pathToFile = constructUrl(pathToFileArray);
-            const pathFromRoot = path.join(__dirname, `../${pathToFile}`);
-            const fileData = await processCsvFile(pathFromRoot);
-            if (fileData) {
-                if (directoryTree) {
-                    if (node && pathToFileArray) {
-                        res.send(fileData);
-                    } else {
-                        res.send('Could not parse file.');
-                    }
-                } else {
-                    res.send('Could not find file in the file structure.');
-                }
+    const folder = readDirectoryTree(`./csvFiles/${folderName}`);
+    if (folder) {
+        let pageData = {};
+        for (let i = 0; i < folder.children.length; i++) {
+            let { node, pathToFileArray } = findFileAndPath(folder, folder.children[i].name);
+            if (node && pathToFileArray) {
+                const pathToFile = constructUrl(pathToFileArray);
+                const pathFromRoot = path.join(__dirname, `../csvFiles/${pathToFile}`);
+                const fileData = await processCsvFile(pathFromRoot);
+                pageData[node.name.slice(0, -4)] = fileData;
             }
+        }
+        if (pageData) {
+            res.send(pageData);
         }
     } else {
         res.send('Could not find directory');
@@ -148,15 +121,7 @@ module.exports.getFile = async (req, res) => {
             const pathFromRoot = path.join(__dirname, `../${pathToFile}`);
             const fileData = await processCsvFile(pathFromRoot);
             if (fileData) {
-                if (directoryTree) {
-                    if (node && pathToFileArray) {
-                        res.send(fileData);
-                    } else {
-                        res.send('Could not parse file.');
-                    }
-                } else {
-                    res.send('Could not find file in the file structure.');
-                }
+                res.send(fileData);
             }
         }
     } else {
