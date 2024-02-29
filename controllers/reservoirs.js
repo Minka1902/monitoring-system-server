@@ -97,16 +97,18 @@ module.exports.getFileStructure = (req, res) => {
 // ! request structure
 // ? req.body={ path: '/path/to/reservoir }
 module.exports.scanDirectoryTree = async (req, res) => {
-    const { folderName } = req.body;
-    const directoryTree = readDirectoryTree(`./forTreeView/${folderName}`);
-    if (directoryTree) {
-        const results = await sumWellsData(directoryTree, `../forTreeView/${folderName}`);
-        if (typeof results === 'object' && results.length !== undefined) {
-            res.send(results);
-        } else {
-            res.send(typeof results === 'object' && results.length === undefined ? results : results[0]);
+    try {
+        const { folderName } = req.body;
+        const directoryTree = readDirectoryTree(`./forTreeView/${folderName}`);
+        if (directoryTree) {
+            const results = await sumWellsData(directoryTree, `../forTreeView/${folderName}`);
+            if (typeof results === 'object' && results.length !== undefined) {
+                res.send(results);
+            } else {
+                res.send(typeof results === 'object' && results.length === undefined ? results : results[0]);
+            }
         }
-    } else {
+    } catch {
         res.send('Could not find directory');
     }
 };

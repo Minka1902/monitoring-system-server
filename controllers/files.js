@@ -87,24 +87,26 @@ function findFileAndPath(tree, targetName, pathToFileArray = []) {
 // ! request structure
 // ? req.body={ folderName: 'main' }
 module.exports.getAllPageFiles = async (req, res) => {
-    const { folderName } = req.body;
-    const folder = readDirectoryTree(`./csvFiles/${folderName}`);
-    if (folder) {
-        let pageData = {};
-        for (let i = 0; i < folder.children.length; i++) {
-            let { node, pathToFileArray } = findFileAndPath(folder, folder.children[i].name);
-            if (node && pathToFileArray) {
-                const pathToFile = constructUrl(pathToFileArray);
-                const pathFromRoot = path.join(__dirname, `../csvFiles/${pathToFile}`);
-                const fileData = await processCsvFile(pathFromRoot);
-                pageData[node.name.slice(0, -4)] = fileData;
+    try {
+        const { folderName } = req.body;
+        const folder = readDirectoryTree(`./csvFiles/${folderName}`);
+        if (folder) {
+            let pageData = {};
+            for (let i = 0; i < folder.children.length; i++) {
+                let { node, pathToFileArray } = findFileAndPath(folder, folder.children[i].name);
+                if (node && pathToFileArray) {
+                    const pathToFile = constructUrl(pathToFileArray);
+                    const pathFromRoot = path.join(__dirname, `../csvFiles/${pathToFile}`);
+                    const fileData = await processCsvFile(pathFromRoot);
+                    pageData[node.name.slice(0, -4)] = fileData;
+                }
+            }
+            if (pageData) {
+                res.send(pageData);
             }
         }
-        if (pageData) {
-            res.send(pageData);
-        }
-    } else {
-        res.send('Could not find directory');
+    } catch {
+        res.send('Something went wrong!')
     }
 };
 
@@ -112,19 +114,21 @@ module.exports.getAllPageFiles = async (req, res) => {
 // ! request structure
 // ? req.body={ fileName: 'example.csv' }
 module.exports.getFile = async (req, res) => {
-    const { fileName } = req.body;
-    const directoryTree = readDirectoryTree(`./csvFiles`);
-    if (directoryTree) {
-        const { node, pathToFileArray } = findFileAndPath(directoryTree, fileName);
-        if (node && pathToFileArray) {
-            const pathToFile = constructUrl(pathToFileArray);
-            const pathFromRoot = path.join(__dirname, `../${pathToFile}`);
-            const fileData = await processCsvFile(pathFromRoot);
-            if (fileData) {
-                res.send(fileData);
+    try {
+        const { fileName } = req.body;
+        const directoryTree = readDirectoryTree(`./csvFiles`);
+        if (directoryTree) {
+            const { node, pathToFileArray } = findFileAndPath(directoryTree, fileName);
+            if (node && pathToFileArray) {
+                const pathToFile = constructUrl(pathToFileArray);
+                const pathFromRoot = path.join(__dirname, `../${pathToFile}`);
+                const fileData = await processCsvFile(pathFromRoot);
+                if (fileData) {
+                    res.send(fileData);
+                }
             }
         }
-    } else {
+    } catch {
         res.send('Could not find directory');
     }
 };
