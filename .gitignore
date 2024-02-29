@@ -7,6 +7,8 @@
 .pnp.js
 error.log
 request.log
+/csvFiles
+/forTreeView
 
 # testing
 /coverage
