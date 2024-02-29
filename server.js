@@ -28,6 +28,7 @@ app.use(bodyParser.json()); // parse application/json
 app.use(requestLogger);     // enabling the request logger
 
 app.use(require('./routes/reservoirs'));
+app.use(require('./routes/files'));
 
 app.use(express.static(`../${folderName}/build`));
 app.get('/', (req, res) => {
