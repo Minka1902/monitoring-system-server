@@ -8,4 +8,10 @@ router.post('/file', celebrate({
     })
 }), getFile);
 
+router.post('/files', celebrate({
+    body: Joi.object().keys({
+        folderName: Joi.string().required(),
+    })
+}), getAllPageFiles);
+
 module.exports = router;
