@@ -1,6 +1,7 @@
 const fs = require('fs');
 const csv = require('csv-parser');
 const path = require('path');
+const wellio = require('wellio');
 
 function readDirectoryTree(directoryPath) {
     const stats = fs.statSync(directoryPath);
@@ -65,6 +66,11 @@ function processCsvFile(filePath) {
     });
 };
 
+async function processLasFile(filePath) {
+    const data = fs.readFileSync(filePath, { encoding: 'utf8' });
+    return data;
+};
+
 function findFileAndPath(tree, targetName, pathToFileArray = []) {
     if (tree.name === targetName) {
         return { node: tree, pathToFileArray: [...pathToFileArray, tree.name] };
@@ -89,24 +95,31 @@ function findFileAndPath(tree, targetName, pathToFileArray = []) {
 module.exports.getAllPageFiles = async (req, res) => {
     try {
         const { folderName } = req.body;
-        const folder = readDirectoryTree(`./csvFiles/${folderName}`);
+        const folder = readDirectoryTree(`./files/${folderName}`);
+        let pageData = {};
         if (folder) {
-            let pageData = {};
             for (let i = 0; i < folder.children.length; i++) {
                 let { node, pathToFileArray } = findFileAndPath(folder, folder.children[i].name);
                 if (node && pathToFileArray) {
                     const pathToFile = constructUrl(pathToFileArray);
-                    const pathFromRoot = path.join(__dirname, `../csvFiles/${pathToFile}`);
-                    const fileData = await processCsvFile(pathFromRoot);
-                    pageData[node.name.slice(0, -4)] = fileData;
+                    const pathFromRoot = path.join(__dirname, `../files/${pathToFile}`);
+                    let fileData;
+                    if (pathToFile.slice(pathToFile.lastIndexOf('.')) === '.csv') {
+                        fileData = await processCsvFile(pathFromRoot);
+                    } else {
+                        const well_as_string = await processLasFile(pathFromRoot);
+                        const well = wellio.las2json(well_as_string);
+                        fileData = well;
+                    }
+                    pageData[node.name.slice(0, node.name.lastIndexOf('.'))] = fileData;
                 }
             }
-            if (pageData) {
-                res.send(pageData);
-            }
+        }
+        if (pageData) {
+            res.send(pageData);
         }
     } catch {
-        res.send('Something went wrong!')
+        res.send({ error: 'There has been an error' });
     }
 };
 
