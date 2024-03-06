@@ -7,7 +7,7 @@
 .pnp.js
 error.log
 request.log
-/csvFiles
+/files
 /forTreeView
 
 # testing
