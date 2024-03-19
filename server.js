@@ -29,6 +29,7 @@ app.use(requestLogger);     // enabling the request logger
 
 app.use(require('./routes/reservoirs'));
 app.use(require('./routes/files'));
+app.use(require('./routes/data'));
 
 app.use(express.static(`../${folderName}/build`));
 app.get('/', (req, res) => {
