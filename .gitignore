@@ -9,6 +9,7 @@ error.log
 request.log
 /files
 /forTreeView
+/data
 
 # testing
 /coverage
