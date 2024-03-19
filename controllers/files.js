@@ -30,14 +30,11 @@ function readDirectoryTree(directoryPath) {
 };
 
 function constructUrl(parts) {
-    // Ensure there are at least two parts (root and filename)
     if (parts.length < 2) {
         throw new Error('Invalid parts array. It should have at least two elements.');
     }
 
-    // Combine the parts into a URL
     const url = parts.reduce((acc, part, index) => {
-        // Use a leading slash for the root and between other parts
         const separator = index === 0 ? '' : '/';
         return `${acc}${separator}${part}`;
     }, '');
@@ -53,8 +50,8 @@ function processCsvFile(filePath) {
             .on('data', (row) => {
                 if (row) {
                     for (const prop in row) {
-                        if (prop !== 'month') {
-                            row[prop] = parseFloat(row[prop])
+                        if (prop !== 'month' && prop !== 'well') {
+                            row[prop] = parseFloat(row[prop]);
                         }
                     }
                     data.push(row);
@@ -76,7 +73,6 @@ function findFileAndPath(tree, targetName, pathToFileArray = []) {
         return { node: tree, pathToFileArray: [...pathToFileArray, tree.name] };
     }
 
-    // for (const child in tree.children) {
     if (tree.children && tree.children.length > 0) {
         for (let i = 0; i < tree.children.length; i++) {
             const result = findFileAndPath(tree.children[i], targetName, [...pathToFileArray, tree.name]);
