@@ -3,6 +3,32 @@ const csv = require('csv-parser');
 const path = require('path');
 const wellio = require('wellio');
 
+function processStringCsvFile(filePath) {
+    return new Promise((resolve) => {
+        const data = [];
+        try {
+            fs.access(filePath, fs.constants.F_OK, (err) => {
+                if (err) {
+                    resolve('File not found.');
+                    return;
+                }
+                fs.createReadStream(filePath)
+                    .pipe(csv())
+                    .on('data', (row) => {
+                        if (row) {
+                            data.push(row);
+                        }
+                    })
+                    .on('end', () => {
+                        resolve(data);
+                    });
+            });
+        } catch (err) {
+            console.log(err);
+        }
+    });
+};
+
 function processCsvFile(filePath) {
     return new Promise((resolve) => {
         const data = [];
@@ -58,6 +84,18 @@ async function processSafetyData() {
     return safetyData;
 }
 
+async function processSeismicData() {
+    const filePath = path.join(__dirname, '../data/seismic/seismic_status.csv');
+    const seismicData = await processStringCsvFile(filePath);
+    return seismicData;
+}
+
+async function processReservesData() {
+    const filePath = path.join(__dirname, '../data/reserves/reserves.csv');
+    const seismicData = await processStringCsvFile(filePath);
+    return seismicData;
+}
+
 async function processPolygonData(polyName) {
     const filePath = path.join(__dirname, `../data/polygons/${polyName}.csv`);
     const polygonData = await processCsvFile(filePath);
@@ -74,11 +112,34 @@ module.exports.getPageData = async (req, res) => {
 
             if (dataName !== 'polygons') {
                 if (dataName !== 'safety') {
-                    if(dataName !== '')
-                    // ! Handling all the files
-                    for (const wellName of wellNames) {
-                        let fileData = await processWellData(dataName, wellName);
-                        pageData[dataName][wellName] = fileData || 'File wasn\'t found or access was denied.';
+                    if (dataName !== 'seismic') {
+                        if (dataName !== 'reserves') {
+                            // ! Handling all the files
+                            for (const wellName of wellNames) {
+                                let fileData = await processWellData(dataName, wellName);
+                                pageData[dataName][wellName] = fileData || 'File wasn\'t found or access was denied.';
+                            }
+                        } else {
+                            // ! Handling reserves
+                            const reservesData = await processReservesData();
+                            if (reservesData) {
+                                for (const wellName of wellNames) {
+                                    for (let reserve of reservesData) {
+                                        if (reserve.name === wellName) {
+                                            pageData[dataName][wellName] = reserve;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    } else {
+                        // ! Handling seismic surveys
+                        const seismicData = await processSeismicData();
+                        if (seismicData) {
+                            for (const field of seismicData) {
+                                pageData[dataName][field.seismic_survey] = { status: field.status };
+                            }
+                        }
                     }
                 } else {
                     // ! Handling safety
