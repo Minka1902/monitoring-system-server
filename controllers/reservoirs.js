@@ -26,21 +26,31 @@ function readDirectoryTree(directoryPath) {
     });
 
     return tree;
-}
+};
 
 function processCsvFile(filePath) {
     return new Promise((resolve) => {
         const data = [];
-        fs.createReadStream(filePath)
-            .pipe(csv())
-            .on('data', (row) => {
-                if (row) {
-                    data.push(row);
+        try {
+            fs.access(filePath, fs.constants.F_OK, (err) => {
+                if (err) {
+                    resolve('File not found.');
+                    return;
                 }
-            })
-            .on('end', () => {
-                resolve(data);
+                fs.createReadStream(filePath)
+                    .pipe(csv())
+                    .on('data', (row) => {
+                        if (row) {
+                            data.push(row);
+                        }
+                    })
+                    .on('end', () => {
+                        resolve(data);
+                    });
             });
+        } catch (err) {
+            console.log(err);
+        }
     });
 };
 
@@ -68,28 +78,103 @@ async function sumWellsData(node, pathToFile) {
         }
     }
     return null;
-}
+};
 
 // POST /reservoir
 // ! request structure
 // ? req.body={ path: '/path/to/reservoir }
 module.exports.getArrayOfWells = (req, res) => {
-    const results = [];
-    fs.createReadStream(path.join(__dirname, `../forTreeView${req.body.path}`))
-        .pipe(csv())
-        .on('data', (data) => {
-            results.push(data);
-        })
-        .on('end', () => {
-            res.json(results);
+    const results = { drilling: [], production: [], test: [] };
+    try {
+        fs.access(path.join(__dirname, `..${req.body.path}`), fs.constants.F_OK, (err) => {
+            if (err) {
+                return;
+            }
+            fs.createReadStream(path.join(__dirname, `..${req.body.path}`))
+                .pipe(csv())
+                .on('data', (data) => {
+                    results[req.body.path.slice(req.body.path.lastIndexOf('-') + 1, -4)].push(data);
+                })
+                .on('end', () => {
+                    res.json(results);
+                });
         });
+    } catch (err) {
+        console.log(err);
+    }
+};
+
+function getLastNodesWithPaths(node) {
+    if (!node.children || node.children.length === 0) {
+        // If the current node is a last node, return an object containing the node and its path
+        return [node];
+    } else {
+        // If the current node has children, recursively traverse them
+        const lastNodesWithPath = [];
+        node.children.forEach((child, index) => {
+            const childLastNodesWithPath = getLastNodesWithPaths(child);
+            lastNodesWithPath.push(...childLastNodesWithPath);
+        });
+        return lastNodesWithPath;
+    }
+};
+
+function addChildToFirstNode(tree, firstNodeName, secondNode) {
+    function traverse(node) {
+        if (node.name === firstNodeName) {
+            if (!node.children) {
+                node.children = [];
+            }
+            node.children.push(secondNode);
+            return true;
+        }
+        if (node.children) {
+            for (const child of node.children) {
+                if (traverse(child)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    traverse(tree);
+};
+
+function addPathToNodes(tree) {
+    function traverse(node, path = '') {
+        const nodePath = `${path}/${node.name}`;
+        node.path = nodePath;
+
+        if (node.children) {
+            for (const child of node.children) {
+                traverse(child, nodePath);
+            }
+        }
+    }
+
+    traverse(tree);
 };
 
 // GET /reservoir
 // ! request structure
 // ? req.body={ path: '/path/to/reservoir }
-module.exports.getFileStructure = (req, res) => {
-    const directoryTree = readDirectoryTree('./forTreeView');
+module.exports.getFileStructure = async (req, res) => {
+    let directoryTree = readDirectoryTree('./forTreeView');
+    addPathToNodes(directoryTree);
+
+    const lastNodes = getLastNodesWithPaths(directoryTree);
+    for (let i = 0; i < lastNodes.length; i++) {
+        const pathToFile = path.join(__dirname, `..${lastNodes[i].path}`);
+        if (lastNodes[i].type === 'file') {
+            const fileContent = await processCsvFile(pathToFile);
+            for (let j = 0; j < fileContent.length; j++) {
+                const newNode = { ...fileContent[j], type: 'well' };
+                addChildToFirstNode(directoryTree, lastNodes[i].name, newNode);
+            }
+        }
+    }
+
     res.send({ tree: directoryTree });
 };
 
@@ -99,7 +184,7 @@ module.exports.getFileStructure = (req, res) => {
 module.exports.scanDirectoryTree = async (req, res) => {
     try {
         const { folderName } = req.body;
-        const directoryTree = readDirectoryTree(`./forTreeView/${folderName}`);
+        const directoryTree = readDirectoryTree(`./forTreeView/${folderName === undefined ? '' : folderName}`);
         if (directoryTree) {
             const results = await sumWellsData(directoryTree, `../forTreeView/${folderName}`);
             if (typeof results === 'object' && results.length !== undefined) {
