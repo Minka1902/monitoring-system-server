@@ -93,7 +93,11 @@ module.exports.getArrayOfWells = (req, res) => {
             fs.createReadStream(path.join(__dirname, `..${req.body.path}`))
                 .pipe(csv())
                 .on('data', (data) => {
-                    results[req.body.path.slice(req.body.path.lastIndexOf('-') + 1, -4)].push(data);
+                    let prop = req.body.path.slice(req.body.path.lastIndexOf('-') + 1, -4);
+                    if (prop !== 'production' && prop !== 'drilling' && prop !== 'test') {
+                        prop = req.body.path.slice(req.body.path.lastIndexOf('/') + 1, -4);
+                    }
+                    results[prop].push(data);
                 })
                 .on('end', () => {
                     res.json(results);
