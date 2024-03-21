@@ -4,6 +4,7 @@ const path = require('path');
 
 function readDirectoryTree(directoryPath) {
     const stats = fs.statSync(directoryPath);
+    // ! need to get config file and pass it on
 
     if (!stats.isDirectory()) {
         return {
@@ -13,6 +14,7 @@ function readDirectoryTree(directoryPath) {
     }
 
     const items = fs.readdirSync(directoryPath);
+    // ? here we add the reorder function
     const tree = {
         name: path.basename(directoryPath),
         type: 'directory',
@@ -173,7 +175,7 @@ module.exports.getFileStructure = async (req, res) => {
         if (lastNodes[i].type === 'file') {
             const fileContent = await processCsvFile(pathToFile);
             for (let j = 0; j < fileContent.length; j++) {
-                const newNode = { ...fileContent[j], type: 'well' };
+                const newNode = { ...fileContent[j], type: 'well', stage: lastNodes[i].name.slice(lastNodes[i].name.lastIndexOf('-') + 1, -4) };
                 addChildToFirstNode(directoryTree, lastNodes[i].name, newNode);
             }
         }
@@ -199,5 +201,38 @@ module.exports.scanDirectoryTree = async (req, res) => {
         }
     } catch {
         res.send('Could not find directory');
+    }
+};
+
+module.exports.initWells = async (req, res) => {
+    try {
+        let directoryTree = readDirectoryTree('./forTreeView');
+        addPathToNodes(directoryTree);
+
+        const lastNodes = getLastNodesWithPaths(directoryTree);
+        for (let i = 0; i < lastNodes.length; i++) {
+            const pathToFile = path.join(__dirname, `..${lastNodes[i].path}`);
+            if (lastNodes[i].type === 'file') {
+                const fileContent = await processCsvFile(pathToFile);
+                for (let j = 0; j < fileContent.length; j++) {
+                    const newNode = { ...fileContent[j], type: 'well', stage: lastNodes[i].name.slice(lastNodes[i].name.lastIndexOf('-') + 1, -4) };
+                    addChildToFirstNode(directoryTree, lastNodes[i].name, newNode);
+                }
+            }
+        }
+
+        const wells = { drilling: [], production: [], test: [] };
+        const newLastNodes = getLastNodesWithPaths(directoryTree);
+        for (const node of newLastNodes) {
+            if (node.stage) {
+                if (wells[node.stage] !== undefined) {
+                    wells[node.stage].push(node);
+                }
+            }
+        }
+        res.send(wells);
+    } catch (err) {
+        console.log(err);
+        res.send(err);
     }
 };

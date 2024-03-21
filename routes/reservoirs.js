@@ -1,6 +1,6 @@
 const { celebrate, Joi } = require('celebrate');
 const router = require('express').Router();
-const { getArrayOfWells, getFileStructure, scanDirectoryTree } = require('../controllers/reservoirs');
+const { getArrayOfWells, getFileStructure, scanDirectoryTree, initWells } = require('../controllers/reservoirs');
 
 router.post('/reservoir', celebrate({
     body: Joi.object().keys({
@@ -15,5 +15,7 @@ router.post('/fields', celebrate({
 }), scanDirectoryTree);
 
 router.get('/reservoirs', getFileStructure);
+
+router.get('/init-wells', initWells);
 
 module.exports = router;
