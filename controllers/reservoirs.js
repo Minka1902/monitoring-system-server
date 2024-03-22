@@ -2,33 +2,47 @@ const fs = require('fs');
 const csv = require('csv-parser');
 const path = require('path');
 
-function readDirectoryTree(directoryPath) {
-    const stats = fs.statSync(directoryPath);
-    // ! need to get config file and pass it on
+function readDirectoryTree(directoryPath, orderJson) {
+    if (orderJson && directoryPath) {
+        const stats = fs.statSync(directoryPath);
+        // ! need to get config file and pass it on
 
-    if (!stats.isDirectory()) {
-        return {
+        if (!stats.isDirectory()) {
+            return {
+                name: path.basename(directoryPath),
+                type: 'file',
+            };
+        }
+
+        const items = fs.readdirSync(directoryPath);
+        const newItems = reorderStringsBySerialNumber(items, orderJson);
+        // ? here we add the reorder function
+        const tree = {
             name: path.basename(directoryPath),
-            type: 'file',
+            type: 'directory',
+            children: [],
         };
+
+        newItems.forEach((item) => {
+            const itemPath = path.join(directoryPath, item);
+            const childTree = readDirectoryTree(itemPath, orderJson);
+            tree.children.push(childTree);
+        });
+
+        return tree;
     }
-
-    const items = fs.readdirSync(directoryPath);
-    // ? here we add the reorder function
-    const tree = {
-        name: path.basename(directoryPath),
-        type: 'directory',
-        children: [],
-    };
-
-    items.forEach((item) => {
-        const itemPath = path.join(directoryPath, item);
-        const childTree = readDirectoryTree(itemPath);
-        tree.children.push(childTree);
-    });
-
-    return tree;
 };
+
+function reorderStringsBySerialNumber(stringsArray, objectsArray) {
+    if (objectsArray && stringsArray) {
+        const filteredObjects = objectsArray.filter(obj => stringsArray.includes(obj.name));
+        filteredObjects.sort((a, b) => parseInt(b.serialNumber) - parseInt(a.serialNumber));
+        const reorderedStrings = filteredObjects.map(obj => obj.name);
+        const stringsNotInObjects = stringsArray.filter(str => !filteredObjects.some(obj => obj.name === str));
+        reorderedStrings.push(...stringsNotInObjects);
+        return reorderedStrings;
+    }
+}
 
 function processCsvFile(filePath) {
     return new Promise((resolve) => {
@@ -166,7 +180,9 @@ function addPathToNodes(tree) {
 // ! request structure
 // ? req.body={ path: '/path/to/reservoir }
 module.exports.getFileStructure = async (req, res) => {
-    let directoryTree = readDirectoryTree('./forTreeView');
+    const orderPath = path.join(__dirname, `../order.csv`);
+    const orderJson = await processCsvFile(orderPath);
+    let directoryTree = readDirectoryTree('./forTreeView', orderJson);
     addPathToNodes(directoryTree);
 
     const lastNodes = getLastNodesWithPaths(directoryTree);
@@ -190,7 +206,9 @@ module.exports.getFileStructure = async (req, res) => {
 module.exports.scanDirectoryTree = async (req, res) => {
     try {
         const { folderName } = req.body;
-        const directoryTree = readDirectoryTree(`./forTreeView/${folderName === undefined ? '' : folderName}`);
+        const orderPath = path.join(__dirname, `../order.csv`);
+        const orderJson = await processCsvFile(orderPath);
+        const directoryTree = readDirectoryTree(`./forTreeView/${folderName === undefined ? '' : folderName}`, orderJson);
         if (directoryTree) {
             const results = await sumWellsData(directoryTree, `../forTreeView/${folderName}`);
             if (typeof results === 'object' && results.length !== undefined) {
@@ -206,7 +224,9 @@ module.exports.scanDirectoryTree = async (req, res) => {
 
 module.exports.initWells = async (req, res) => {
     try {
-        let directoryTree = readDirectoryTree('./forTreeView');
+        const orderPath = path.join(__dirname, `../order.csv`);
+        const orderJson = await processCsvFile(orderPath);
+        let directoryTree = readDirectoryTree('./forTreeView', orderJson);
         addPathToNodes(directoryTree);
 
         const lastNodes = getLastNodesWithPaths(directoryTree);
